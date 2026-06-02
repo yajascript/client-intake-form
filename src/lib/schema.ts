@@ -8,7 +8,7 @@ export const intakeSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().optional().or(z.literal("")),
   whatDoYouDo: z.string().optional().or(z.literal("")),
-  
+
   socialLinks: z.array(z.object({
     platform: z.string(),
     url: z.string() // keeping it simple, allow handle/URL
@@ -36,6 +36,7 @@ export const intakeSchema = z.object({
 
   // Style
   brandVoice: z.array(z.string()).optional(),
+  logoUrl: z.string().url().optional(),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
   tertiaryColor: z.string().optional(),
@@ -80,10 +81,11 @@ export const defaultIntakeFormPayload: IntakeFormPayload = {
   projectGoal: "",
   keywords: [],
   competitors: [
-    { name: "", doingWell: "", doingPoorly: "", differentiate: "" }
+    { name: "", doingWell: "", differentiate: "" }
   ],
   brandVoice: [],
-  primaryColor: "#3B82F6", // from screenshot
+  logoUrl: "",
+  primaryColor: "#3B82F6",
   secondaryColor: "#1E293B",
   tertiaryColor: "#D16900",
   neutralColor: "#0F172A",

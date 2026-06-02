@@ -40,6 +40,21 @@ export async function processIntakeSubmission(
         filename: logoFile.name,
         content: buffer,
       });
+    } else if (parsedPayload.logoUrl) {
+      try {
+        const logoResponse = await fetch(parsedPayload.logoUrl);
+        if (logoResponse.ok) {
+          const arrayBuffer = await logoResponse.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const ext = parsedPayload.logoUrl.split('.').pop()?.split('?')[0] || 'png';
+          attachments.push({
+            filename: `logo.${ext}`,
+            content: buffer,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch logo from Blob", err);
+      }
     }
 
     // 4. Send Email via Resend (DISABLED FOR NOW)

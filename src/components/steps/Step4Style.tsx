@@ -6,9 +6,11 @@ import { Image as ImageIcon, Search, Home, User, Pen, Tag, Box, Sparkles, Chevro
 interface Step4StyleProps {
   data: IntakeFormPayload;
   updateData: (updates: Partial<IntakeFormPayload>) => void;
+  logoFile: File | null;
   setLogoFile: (file: File | null) => void;
   errors?: Record<string, string>;
   clearError?: (field: string) => void;
+  sessionId: string;
 }
 
 const voiceOptions = [
@@ -98,8 +100,8 @@ function generateShades(hex: string) {
   return shades.reverse();
 }
 
-export const Step4Style: React.FC<Step4StyleProps> = ({ data, updateData, setLogoFile, errors = {}, clearError }) => {
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+export const Step4Style: React.FC<Step4StyleProps> = ({ data, updateData, logoFile, setLogoFile, errors = {}, clearError, sessionId }) => {
+  // logoPreview state moved down
   const [isExtracting, setIsExtracting] = useState(false);
   const [activeTheme, setActiveTheme] = useState<"dark-neutral" | "light-airy" | "monochromatic" | "complementary">("dark-neutral");
   const imgRef = useRef<HTMLImageElement>(null);
@@ -153,23 +155,48 @@ export const Step4Style: React.FC<Step4StyleProps> = ({ data, updateData, setLog
     updateData({ secondaryColor, tertiaryColor, neutralColor });
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setLogoFile(file);
-      if (clearError) clearError('logo');
-      const url = URL.createObjectURL(file);
-      setLogoPreview(url);
-    }
-  };
+  const [logoPreview, setLogoPreview] = useState<string | null>(data.logoUrl || null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   useEffect(() => {
-    return () => {
-      if (logoPreview) {
-        URL.revokeObjectURL(logoPreview);
+    if (!logoFile && data.logoUrl) {
+      setLogoPreview(data.logoUrl);
+    }
+  }, [data.logoUrl, logoFile]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      setLogoFile(file);
+      if (clearError) clearError('logo');
+      
+      // Temporary local preview while uploading
+      const tempUrl = URL.createObjectURL(file);
+      setLogoPreview(tempUrl);
+      setIsUploadingLogo(true);
+      
+      try {
+        const response = await fetch(`/api/upload?sessionId=${sessionId}&filename=${encodeURIComponent(file.name)}`, {
+          method: "POST",
+          body: file,
+        });
+        
+        if (response.ok) {
+          const newBlob = await response.json();
+          updateData({ logoUrl: newBlob.url });
+          setLogoPreview(newBlob.url);
+        } else {
+          console.error("Failed to upload logo");
+          alert("Failed to upload logo to server.");
+        }
+      } catch (error) {
+        console.error("Error uploading logo", error);
+      } finally {
+        setIsUploadingLogo(false);
       }
-    };
-  }, [logoPreview]);
+    }
+  };
 
   const extractColors = () => {
     if (!imgRef.current) return;
@@ -459,10 +486,15 @@ export const Step4Style: React.FC<Step4StyleProps> = ({ data, updateData, setLog
                   onChange={handleLogoUpload}
                   title=""
                 />
-                {logoPreview ? (
+                {isUploadingLogo ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-[#ADC8FF] animate-pulse" />
+                    <span className="text-xs font-medium text-white/60">Uploading...</span>
+                  </div>
+                ) : logoPreview ? (
                   <img
                     ref={imgRef}
-                    src={logoPreview}
+                    src={logoPreview.startsWith('https://') ? `/api/image?url=${encodeURIComponent(logoPreview)}` : logoPreview}
                     alt="Logo Preview"
                     className="h-16 w-auto object-contain rounded drop-shadow-lg relative z-10"
                     crossOrigin="anonymous"
@@ -470,7 +502,7 @@ export const Step4Style: React.FC<Step4StyleProps> = ({ data, updateData, setLog
                 ) : (
                   <>
                     <ImageIcon className="w-6 h-6 text-white/40 mb-1" />
-                    <span className="text-xs font-medium text-white/60">Upload Logo (SVG, PNG)</span>
+                    <span className="text-xs font-medium text-white/60">Upload Logo (SVG, PNG, JPG)</span>
                   </>
                 )}
               </div>

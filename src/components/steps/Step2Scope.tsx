@@ -1,6 +1,6 @@
 import React from "react";
 import { IntakeFormPayload } from "@/lib/schema";
-import { Check, Mail, CreditCard, Calendar, Users, BarChart, MapPin, Lock, Code2, LayoutTemplate, ShoppingCart, AppWindow, Smartphone } from "lucide-react";
+import { Check, Mail, CreditCard, Calendar, Users, BarChart, MapPin, Lock, Code2, LayoutTemplate, ShoppingCart, AppWindow, Smartphone, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TextAreaField } from "../TextAreaField";
 
@@ -28,6 +28,18 @@ const integrationOptions = [
   { id: "auth", label: "Auth", icon: Lock },
   { id: "custom", label: "Custom", icon: Code2 },
 ];
+
+const integrationHelp: Record<string, string> = {
+  payments: "Stripe, PayPal, Square, etc.",
+  auth: "Social / SSO options: Apple Sign‑In, Google, Microsoft, GitHub, etc.",
+  email: "Resend, SendGrid, Mailgun, AWS SES, etc.",
+  scheduling: "Calendly, Google Calendar, Microsoft Bookings, etc.",
+  crm: "HubSpot, Salesforce, Pipedrive, Zoho CRM, etc.",
+  analytics: "Google Analytics, Mixpanel, Amplitude, Plausible, etc.",
+  maps: "Google Maps, Mapbox, OpenStreetMap, etc.",
+  custom: "Any custom third‑party API you need to connect."
+};
+
 
 export const Step2Scope: React.FC<Step2ScopeProps> = ({ data, updateData, errors = {}, clearError }) => {
   const toggleProjectType = (typeId: string) => {
@@ -64,7 +76,7 @@ export const Step2Scope: React.FC<Step2ScopeProps> = ({ data, updateData, errors
     <div className="flex flex-col gap-8">
       <div className="glass p-8 flex flex-col gap-6">
         <h2 className="text-xl font-semibold mb-2">What Are We Building?</h2>
-        
+
         <div className="flex flex-col gap-3">
           <label className={cn("text-sm font-medium ml-1", errors.projectType ? "text-rose-400" : "text-white/80")}>
             Project Type <span className="text-yellow-400">*</span>
@@ -163,7 +175,7 @@ export const Step2Scope: React.FC<Step2ScopeProps> = ({ data, updateData, errors
           <h2 className="text-xl font-semibold">Key Integrations <span className="text-yellow-400">*</span></h2>
           <span className="text-xs text-white/50">{(data.integrations || []).length} Selected</span>
         </div>
-        
+
         <div className={cn("grid grid-cols-2 md:grid-cols-4 gap-4", errors.integrations ? "ring-1 ring-rose-400/50 p-2 rounded-xl" : "")}>
           {integrationOptions.map((opt) => {
             const isSelected = (data.integrations || []).includes(opt.id);
@@ -172,7 +184,7 @@ export const Step2Scope: React.FC<Step2ScopeProps> = ({ data, updateData, errors
                 key={opt.id}
                 onClick={() => toggleIntegration(opt.id)}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-3 p-6 rounded-lg border transition-all",
+                  "flex flex-col items-center justify-center gap-3 p-6 rounded-lg border transition-all relative group",
                   isSelected
                     ? "bg-[#ADC8FF]/10 border-[#ADC8FF]"
                     : "bg-[#121c33]/50 border-white/10 hover:border-white/30"
@@ -182,6 +194,14 @@ export const Step2Scope: React.FC<Step2ScopeProps> = ({ data, updateData, errors
                 <span className={cn("text-xs font-medium tracking-wider uppercase", isSelected ? "text-[#ADC8FF]" : "text-white/60")}>
                   {opt.label}
                 </span>
+                {/* Desktop Hover Tooltip */}
+                <div className="absolute bottom-full mb-2 hidden md:group-hover:block w-48 left-1/2 -translate-x-1/2 bg-[#121c33] text-white text-center text-xs p-2 rounded-md shadow-xl border border-white/20 backdrop-filter backdrop-blur-md animate-in fade-in slide-in-from-bottom-1 duration-150 z-50 pointer-events-none">
+                  {integrationHelp[opt.id]}
+                </div>
+                {/* Mobile Inline Help */}
+                {/* <span className="text-[10px] text-white/40 mt-1 md:hidden leading-tight text-center px-1">
+                  {integrationHelp[opt.id]}
+                </span> */}
               </button>
             );
           })}

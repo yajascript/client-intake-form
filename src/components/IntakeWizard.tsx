@@ -24,24 +24,21 @@ import { Step5Launch } from "./steps/Step5Launch";
 interface IntakeWizardProps {
   dictionary: any;
   locale: string;
+  sessionParam?: string;
 }
 
-export default function IntakeWizard({ dictionary, locale }: IntakeWizardProps) {
-  const searchParams = useSearchParams();
-  const sessionParam = searchParams?.get("session");
+export default function IntakeWizard({ dictionary, locale, sessionParam }: IntakeWizardProps) {
   const [sessionId, setSessionId] = useState<string>("");
 
   useEffect(() => {
     if (sessionParam) {
       setSessionId(sessionParam);
-    } else {
-      const newSession = crypto.randomUUID();
-      setSessionId(newSession);
-      window.history.replaceState(null, "", `/${locale}/intake?session=${newSession}`);
     }
-  }, [sessionParam, locale]);
+  }, [sessionParam]);
 
-  const { data, updateData, isLoading, isSaving, isDirty } = useIntakeSession(sessionId);
+  const { data, updateData, saveData, isLoading, isSaving, isDirty } = useIntakeSession(sessionId);
+
+  // Auto-rename logic moved to handleNext
   const [currentStep, setCurrentStep] = useState(1);
   const [direction, setDirection] = useState(0);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -65,7 +62,11 @@ export default function IntakeWizard({ dictionary, locale }: IntakeWizardProps) 
       if (!data.clientName?.trim()) errs.clientName = "Client Name cannot be empty";
       if (!data.businessName?.trim()) errs.businessName = "Business Name cannot be empty";
       if (!data.tagline?.trim()) errs.tagline = "Tagline cannot be empty";
-      if (!data.email?.trim()) errs.email = "Email cannot be empty";
+      if (!data.email?.trim()) {
+        errs.email = "Email cannot be empty";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        errs.email = "Please enter a valid email address";
+      }
       if (!data.whatDoYouDo?.trim()) errs.whatDoYouDo = "Please describe what you do";
     }
     if (upToStep >= 2) {
@@ -80,8 +81,8 @@ export default function IntakeWizard({ dictionary, locale }: IntakeWizardProps) 
       }
     }
     if (upToStep >= 4) {
-      if (!logoFile) {
-        errs.logo = "Please upload a brand logo to continue";
+      if (!logoFile && !data.logoUrl) {
+        errs.logo = "Brand logo is required";
       }
     }
     if (upToStep >= 5) {
@@ -124,8 +125,51 @@ export default function IntakeWizard({ dictionary, locale }: IntakeWizardProps) 
     });
   };
 
+  const autoRenameSession = () => {
+    if (!data.clientName && !data.businessName) return;
+    
+    const parts = [data.clientName, data.businessName].filter(Boolean);
+    const slug = parts.join("-").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    
+    if (slug && slug !== sessionId) {
+      const oldSessionId = sessionId;
+      const newFriendlySession = slug;
+      
+      setSessionId(newFriendlySession);
+      window.history.replaceState(null, "", `/${locale}/intake?session=${newFriendlySession}`);
+      
+      if (!oldSessionId) {
+        // First time creating the session
+        fetch(`/api/session/sync?session=${newFriendlySession}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+      } else {
+        // Fire off rename request to move all blobs and clean up the old ones
+        fetch("/api/session/rename", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oldSessionId, newSessionId: newFriendlySession }),
+        }).then(() => {
+          // After rename is complete, sync the latest data into the new json
+          fetch(`/api/session/sync?session=${newFriendlySession}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+        });
+      }
+    }
+  };
+
   const handleNext = () => {
     if (!canProceedToNextStep(currentStep + 1)) return;
+
+    if (currentStep === 1) {
+      autoRenameSession();
+    }
+
     if (currentStep < totalSteps) {
       setDirection(1);
       setCurrentStep(prev => prev + 1);
@@ -147,6 +191,10 @@ export default function IntakeWizard({ dictionary, locale }: IntakeWizardProps) 
   const setStep = (step: number) => {
     // If they are trying to jump ahead, validate their current step first
     if (step > currentStep && !canProceedToNextStep(step)) return;
+
+    if (currentStep === 1 && step > 1) {
+      autoRenameSession();
+    }
 
     setDirection(step > currentStep ? 1 : -1);
     setCurrentStep(step);
@@ -195,7 +243,7 @@ export default function IntakeWizard({ dictionary, locale }: IntakeWizardProps) 
     }
   };
 
-  if (isLoading || !sessionId) {
+  if (isLoading) {
     return <div className="text-white/60 text-center py-20">Loading session...</div>;
   }
 
@@ -303,7 +351,14 @@ export default function IntakeWizard({ dictionary, locale }: IntakeWizardProps) 
   }
 
   return (
-    <div className="w-full flex flex-col gap-8 pb-12">
+    <div className="w-full flex flex-col gap-8 pb-12" onBlur={(e) => {
+      // Avoid saving if focus moves within the same container,
+      // but to be safe we can just save anytime focus leaves any field.
+      saveData();
+
+      // Auto-rename the session ID if they just finished typing the client/business name
+      autoRenameSession();
+    }}>
       {/* Header */}
       <div className="sticky top-0 z-40 bg-[#040B18]/90 backdrop-blur-md pt-4 pb-4 border-b border-white/5 flex items-center justify-between -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
@@ -347,9 +402,9 @@ export default function IntakeWizard({ dictionary, locale }: IntakeWizardProps) 
           )}
 
           {currentStep === 4 && (
-            <WizardStepContainer key="step4" direction={direction}>
-              <Step4Style data={data} updateData={updateData} setLogoFile={setLogoFile} errors={errors} clearError={clearError} />
-            </WizardStepContainer>
+            <WizardStepContainer isActive={currentStep === 4} direction={direction}>
+            <Step4Style data={data} updateData={updateData} logoFile={logoFile} setLogoFile={setLogoFile} errors={errors} clearError={clearError} sessionId={sessionId} />
+          </WizardStepContainer>
           )}
 
           {currentStep === 5 && (
