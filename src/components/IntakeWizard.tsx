@@ -34,7 +34,7 @@ export default function IntakeWizard({ dictionary, locale, sessionParam }: Intak
     if (sessionParam) {
       setSessionId(sessionParam);
     }
-  }, [sessionParam]);
+  }, [sessionParam, locale]);
 
   const { data, updateData, saveData, isLoading, isSaving, isDirty } = useIntakeSession(sessionId);
 
@@ -243,7 +243,7 @@ export default function IntakeWizard({ dictionary, locale, sessionParam }: Intak
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !data.clientName && !data.businessName && currentStep === 1) {
     return <div className="text-white/60 text-center py-20">Loading session...</div>;
   }
 
@@ -402,9 +402,9 @@ export default function IntakeWizard({ dictionary, locale, sessionParam }: Intak
           )}
 
           {currentStep === 4 && (
-            <WizardStepContainer isActive={currentStep === 4} direction={direction}>
-            <Step4Style data={data} updateData={updateData} logoFile={logoFile} setLogoFile={setLogoFile} errors={errors} clearError={clearError} sessionId={sessionId} />
-          </WizardStepContainer>
+            <WizardStepContainer key="step4" direction={direction}>
+              <Step4Style data={data} updateData={updateData} logoFile={logoFile} setLogoFile={setLogoFile} errors={errors} clearError={clearError} sessionId={sessionId} />
+            </WizardStepContainer>
           )}
 
           {currentStep === 5 && (
